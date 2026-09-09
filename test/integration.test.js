@@ -32,15 +32,24 @@ async function waitFor(pred, ms = 5000, every = 50) {
 }
 
 // Run a hook mode to completion with JSON on stdin, the way Claude Code does.
+// Asynchronous on purpose: the test process must keep draining the pty
+// holder's pipe while the hook runs, or the plugin's blocking writes to the
+// terminal would back up and stall the hook.
 function hook(mode, input, env = {}) {
     const t0 = Date.now();
-    const r = spawnSync(process.execPath, [INDEX, mode], {
-        input: JSON.stringify(input),
-        env: { ...process.env, COLORTERM: 'truecolor', ...env },
-        encoding: 'utf8',
-        timeout: 30000,
+    return new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [INDEX, mode], {
+            env: { ...process.env, COLORTERM: 'truecolor', ...env },
+            stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        let stdout = '', stderr = '';
+        child.stdout.on('data', (d) => { stdout += d; });
+        child.stderr.on('data', (d) => { stderr += d; });
+        const timer = setTimeout(() => child.kill('SIGKILL'), 30000);
+        child.on('error', reject);
+        child.on('close', (status, signal) => { clearTimeout(timer); resolve({ status, signal, stdout, stderr, ms: Date.now() - t0 }); });
+        child.stdin.end(JSON.stringify(input));
     });
-    return { ...r, ms: Date.now() - t0 };
 }
 
 // Launch the animation loop directly (as the start hook would) and return the child.
@@ -54,8 +63,8 @@ function launchRun(env) {
 
 function katakanaCount(s) { return (s.match(/[ｦ-ﾝ]/g) || []).length; }
 
-test('start hook does nothing without a terminal', { skip }, () => {
-    const r = hook('--start', { prompt: 'hi' }, { MATRIX_TTY: '' });
+test('start hook does nothing without a terminal', { skip }, async () => {
+    const r = await hook('--start', { prompt: 'hi' }, { MATRIX_TTY: '' });
     // This test runner has no controlling terminal, so ppid lookup fails and
     // the hook stands down. (If it is run from an interactive shell the hook
     // would find that shell's tty instead, so only assert on the exit code.)
@@ -67,7 +76,7 @@ test('start hook exits quickly, writes a per-tty lock, and the rain draws on the
     const pty = await openPty(60, 16);
     const lock = m.lockPath(pty.tty);
     try {
-        const r = hook('--start', { prompt: 'Tell me a joke', cwd: os.tmpdir() }, { MATRIX_TTY: pty.tty });
+        const r = await hook('--start', { prompt: 'Tell me a joke', cwd: os.tmpdir() }, { MATRIX_TTY: pty.tty });
         assert.equal(r.status, 0);
         assert.equal(r.stdout, '');
         assert.ok(r.ms < 2000, `start hook took ${r.ms} ms`);
@@ -90,14 +99,14 @@ test('start hook exits quickly, writes a per-tty lock, and the rain draws on the
         assert.ok(moves.some((mv) => mv.row === 10), 'the last rain row is used');
 
         // A second start on the same terminal is a no-op.
-        const r2 = hook('--start', { prompt: 'again' }, { MATRIX_TTY: pty.tty });
+        const r2 = await hook('--start', { prompt: 'again' }, { MATRIX_TTY: pty.tty });
         assert.equal(r2.status, 0);
         assert.equal(m.readLockPid(lock), pid, 'lock unchanged');
 
         // Stop: graceful wind-down, then restore and nudge.
         const dbg = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mtl-log-')), 'debug.log');
         pty.reset();
-        const s = hook('--stop', { cwd: os.tmpdir() }, { MATRIX_TTY: pty.tty, MATRIX_WIND_DOWN_MS: '300', MATRIX_DEBUG: dbg });
+        const s = await hook('--stop', { cwd: os.tmpdir() }, { MATRIX_TTY: pty.tty, MATRIX_WIND_DOWN_MS: '300', MATRIX_DEBUG: dbg });
         assert.equal(s.status, 0);
         assert.equal(s.stdout, '');
         assert.ok(s.ms < 4000, `stop hook took ${s.ms} ms`);
@@ -119,15 +128,15 @@ test('two terminals get independent rains and stops', { skip }, async () => {
     const b = await openPty(40, 12);
     const la = m.lockPath(a.tty), lb = m.lockPath(b.tty);
     try {
-        assert.equal(hook('--start', {}, { MATRIX_TTY: a.tty }).status, 0);
-        assert.equal(hook('--start', {}, { MATRIX_TTY: b.tty }).status, 0);
+        assert.equal((await hook('--start', {}, { MATRIX_TTY: a.tty })).status, 0);
+        assert.equal((await hook('--start', {}, { MATRIX_TTY: b.tty })).status, 0);
         const pa = m.readLockPid(la), pb = m.readLockPid(lb);
         assert.ok(pa && pb && pa !== pb, 'two distinct run processes');
         assert.ok(await waitFor(() => katakanaCount(a.output()) > 10 && katakanaCount(b.output()) > 10, 3000));
-        hook('--stop', {}, { MATRIX_TTY: a.tty, MATRIX_WIND_DOWN_MS: '0' });
+        await hook('--stop', {}, { MATRIX_TTY: a.tty, MATRIX_WIND_DOWN_MS: '0' });
         assert.ok(await waitFor(() => !m.isAlive(pa), 2000), 'terminal A stopped');
         assert.ok(m.isAlive(pb), 'terminal B keeps raining');
-        hook('--stop', {}, { MATRIX_TTY: b.tty, MATRIX_WIND_DOWN_MS: '0' });
+        await hook('--stop', {}, { MATRIX_TTY: b.tty, MATRIX_WIND_DOWN_MS: '0' });
         assert.ok(await waitFor(() => !m.isAlive(pb), 2000), 'terminal B stopped');
     } finally {
         for (const l of [la, lb]) { try { process.kill(m.readLockPid(l), 'SIGKILL'); } catch (e) {} try { fs.unlinkSync(l); } catch (e) {} }
@@ -140,13 +149,13 @@ test('a stale lock with a recycled pid does not block the rain', { skip }, async
     const lock = m.lockPath(pty.tty);
     try {
         fs.writeFileSync(lock, String(process.pid)); // alive, but not a rain process
-        assert.equal(hook('--start', {}, { MATRIX_TTY: pty.tty }).status, 0);
+        assert.equal((await hook('--start', {}, { MATRIX_TTY: pty.tty })).status, 0);
         const pid = m.readLockPid(lock);
         assert.notEqual(pid, process.pid, 'lock was replaced');
         assert.ok(m.isRainProcess(pid));
         // A stop with that stale lock must not signal the test runner either.
         fs.writeFileSync(lock, String(process.pid));
-        assert.equal(hook('--stop', {}, { MATRIX_TTY: pty.tty, MATRIX_WIND_DOWN_MS: '0' }).status, 0);
+        assert.equal((await hook('--stop', {}, { MATRIX_TTY: pty.tty, MATRIX_WIND_DOWN_MS: '0' })).status, 0);
         assert.ok(m.isAlive(pid), 'the real rain was left alone');
         process.kill(pid, 'SIGTERM');
         assert.ok(await waitFor(() => !m.isAlive(pid), 2000));
