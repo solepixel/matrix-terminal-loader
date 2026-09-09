@@ -1,0 +1,21 @@
+{
+  "name": "matrix-terminal-loader",
+  "version": "1.0.0",
+  "description": "Claude Code plugin: Matrix digital rain in the terminal while Claude is thinking.",
+  "private": true,
+  "license": "MIT",
+  "author": "solepixel",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solepixel/matrix-terminal-loader.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/unit.test.js test/integration.test.js",
+    "test:unit": "node --test test/unit.test.js",
+    "validate": "claude plugin validate . --strict",
+    "demo": "node index.js --run"
+  }
+}

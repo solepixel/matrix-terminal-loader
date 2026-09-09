@@ -54,11 +54,28 @@
       "description": "Optional custom status phrases, separated by | (for example: Jacking in|Bending spoons). Leave empty for the built-in list.",
       "default": ""
     },
+    "keep_bottom_rows": {
+      "type": "number",
+      "title": "Rows kept clear at the bottom",
+      "description": "How many rows at the bottom of the terminal the rain never touches, so Claude Code's prompt box and status line stay clean while you type. Raise it if your prompt box sits higher (extra notice lines, long multi-line prompts).",
+      "default": 6
+    },
     "wind_down_ms": {
       "type": "number",
       "title": "Wind-down time (ms)",
-      "description": "Longest the rain may take to drain off the screen after Claude finishes.",
+      "description": "Longest the rain may take to drain off the screen after Claude finishes (capped at 15000).",
       "default": 4000
     }
-  }
+  },
+  "homepage": "https://github.com/solepixel/matrix-terminal-loader",
+  "repository": "https://github.com/solepixel/matrix-terminal-loader",
+  "license": "MIT",
+  "keywords": [
+    "matrix",
+    "spinner",
+    "loader",
+    "animation",
+    "terminal",
+    "hooks"
+  ]
 }
