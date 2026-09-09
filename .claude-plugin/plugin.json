@@ -23,10 +23,42 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/index.js\" --stop",
-            "timeout": 10
+            "timeout": 20
           }
         ]
       }
     ]
+  },
+  "userConfig": {
+    "show_messages": {
+      "type": "boolean",
+      "title": "Show Claude's progress messages",
+      "description": "Overlay Claude's progress as formatted bullets. Off by default, so Claude's own messages show through the rain where they appear.",
+      "default": false
+    },
+    "message_lines": {
+      "type": "number",
+      "title": "Message lines",
+      "description": "How many recent progress messages to keep on screen as they scroll up.",
+      "default": 40
+    },
+    "show_status": {
+      "type": "boolean",
+      "title": "Show Matrix status line",
+      "description": "Show a Matrix-themed status line with a held verb. Off by default; Claude Code's own spinner shows through instead.",
+      "default": false
+    },
+    "status_verbs": {
+      "type": "string",
+      "title": "Status verbs",
+      "description": "Optional custom status phrases, separated by | (for example: Jacking in|Bending spoons). Leave empty for the built-in list.",
+      "default": ""
+    },
+    "wind_down_ms": {
+      "type": "number",
+      "title": "Wind-down time (ms)",
+      "description": "Longest the rain may take to drain off the screen after Claude finishes.",
+      "default": 4000
+    }
   }
 }

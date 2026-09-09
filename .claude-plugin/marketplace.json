@@ -1,0 +1,29 @@
+{
+  "name": "solepixel",
+  "owner": {
+    "name": "solepixel"
+  },
+  "description": "solepixel's Claude Code plugins.",
+  "plugins": [
+    {
+      "name": "matrix-terminal-loader",
+      "source": ".",
+      "description": "Matrix digital rain in the terminal while Claude is thinking.",
+      "version": "1.0.0",
+      "author": {
+        "name": "solepixel"
+      },
+      "category": "fun",
+      "keywords": [
+        "matrix",
+        "spinner",
+        "loader",
+        "animation",
+        "terminal",
+        "hooks"
+      ],
+      "license": "MIT",
+      "homepage": "https://github.com/solepixel/matrix-terminal-loader"
+    }
+  ]
+}
