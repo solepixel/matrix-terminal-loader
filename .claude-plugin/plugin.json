@@ -1,0 +1,32 @@
+{
+  "name": "matrix-terminal-loader",
+  "version": "1.0.0",
+  "description": "Replaces the default spinner with a Matrix digital rain animation in the terminal while Claude is thinking.",
+  "author": {
+    "name": "solepixel"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/index.js\" --start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/index.js\" --stop",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
